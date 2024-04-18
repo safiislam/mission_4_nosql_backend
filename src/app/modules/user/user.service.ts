@@ -17,8 +17,11 @@ import {
   generateFacultyId,
   generateStudentId,
 } from './user.utils';
+import { verifyJwt } from '../Auth/auth.utils';
+import { JwtPayload } from 'jsonwebtoken';
+import { sendImageToCloudinary } from '../../utils/sendImageToCloudinary';
 
-const createStudentIntoDB = async (password: string, payload: TStudent) => {
+const createStudentIntoDB = async (file: any, password: string, payload: TStudent) => {
   // create a user object
   const userData: Partial<TUser> = {};
 
@@ -27,6 +30,7 @@ const createStudentIntoDB = async (password: string, payload: TStudent) => {
 
   //set student role
   userData.role = 'student';
+  userData.email = payload.email
 
   // find academic semester info
   const admissionSemester = await AcademicSemester.findById(
@@ -36,15 +40,19 @@ const createStudentIntoDB = async (password: string, payload: TStudent) => {
   if (!admissionSemester) {
     throw new AppError(400, 'Admission semester not found');
   }
-  
+
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
     //set  generated id
     userData.id = await generateStudentId(admissionSemester);
-
+    const { path } = file
+    const imageName = `${userData.id}${payload.name.firstName}`
+    const { secure_url } = await sendImageToCloudinary(imageName, path)
     // create a user (transaction-1)
+
+
     const newUser = await User.create([userData], { session }); // array
 
     //create a student
@@ -54,7 +62,7 @@ const createStudentIntoDB = async (password: string, payload: TStudent) => {
     // set id , _id as user
     payload.id = newUser[0].id;
     payload.user = newUser[0]._id; //reference _id
-
+    payload.profileImg = secure_url
     // create a student (transaction-2)
 
     const newStudent = await Student.create([payload], { session });
@@ -83,6 +91,7 @@ const createFacultyIntoDB = async (password: string, payload: TFaculty) => {
 
   //set student role
   userData.role = 'faculty';
+  userData.email = payload.email
 
   // find academic department info
   const academicDepartment = await AcademicDepartment.findById(
@@ -139,6 +148,7 @@ const createAdminIntoDB = async (password: string, payload: TFaculty) => {
 
   //set student role
   userData.role = 'admin';
+  userData.email = payload.email
 
   const session = await mongoose.startSession();
 
@@ -148,7 +158,7 @@ const createAdminIntoDB = async (password: string, payload: TFaculty) => {
     userData.id = await generateAdminId();
 
     // create a user (transaction-1)
-    const newUser = await User.create([userData], { session }); 
+    const newUser = await User.create([userData], { session });
 
     //create a admin
     if (!newUser.length) {
@@ -176,8 +186,26 @@ const createAdminIntoDB = async (password: string, payload: TFaculty) => {
   }
 };
 
+const getMe = async (decoded: JwtPayload) => {
+
+  const { userId, role } = decoded
+
+  let result = null
+  if (role === 'student') {
+    result = await User.findOne({ id: userId })
+  }
+  if (role === 'admin') {
+    result = await User.findOne({ id: userId })
+  }
+  if (role === 'faculty') {
+    result = await User.findOne({ id: userId })
+  }
+  return result
+}
+
 export const UserServices = {
   createStudentIntoDB,
   createFacultyIntoDB,
   createAdminIntoDB,
+  getMe
 };

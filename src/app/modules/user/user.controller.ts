@@ -6,7 +6,8 @@ import { UserServices } from './user.service';
 const createStudent = catchAsync(async (req, res) => {
   const { password, student: studentData } = req.body;
 
-  const result = await UserServices.createStudentIntoDB(password, studentData);
+
+  const result = await UserServices.createStudentIntoDB(req?.file, password, studentData);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -41,9 +42,19 @@ const createAdmin = catchAsync(async (req, res) => {
     data: result,
   });
 });
+const getMe = catchAsync(async (req, res) => {
+  const result = await UserServices.getMe(req.user)
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Get me successfully',
+    data: result,
+  });
+})
 
 export const UserControllers = {
   createStudent,
   createFaculty,
   createAdmin,
+  getMe
 };
